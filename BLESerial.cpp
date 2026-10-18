@@ -23,16 +23,25 @@
 uint32_t bt_passkey_callback();
 void bt_passkey_notify_callback(uint32_t passkey);
 bool bt_security_request_callback();
-void bt_authentication_complete_callback(esp_ble_auth_cmpl_t auth_result);
 bool bt_confirm_pin_callback(uint32_t pin);
 void bt_connect_callback(BLEServer *server);
 void bt_disconnect_callback(BLEServer *server);
 bool bt_client_authenticated();
 
+#if defined(CONFIG_BLUEDROID_ENABLED)
+void bt_authentication_complete_callback(esp_ble_auth_cmpl_t auth_result);
+#elif defined(CONFIG_NIMBLE_ENABLED)
+void bt_authentication_complete_callback(ble_gap_conn_desc *desc);
+#endif
+
 uint32_t BLESerial::onPassKeyRequest() { return bt_passkey_callback(); }
 void BLESerial::onPassKeyNotify(uint32_t passkey) { bt_passkey_notify_callback(passkey); }
 bool BLESerial::onSecurityRequest() { return bt_security_request_callback(); }
+#if defined(CONFIG_BLUEDROID_ENABLED)
 void BLESerial::onAuthenticationComplete(esp_ble_auth_cmpl_t auth_result) { bt_authentication_complete_callback(auth_result); }
+#elif defined(CONFIG_NIMBLE_ENABLED)
+void BLESerial::onAuthenticationComplete(ble_gap_conn_desc *desc) { bt_authentication_complete_callback(desc); }
+#endif
 void BLESerial::onConnect(BLEServer *server) { bt_connect_callback(server); }
 void BLESerial::onDisconnect(BLEServer *server) { bt_disconnect_callback(server); ble_server->startAdvertising(); }
 bool BLESerial::onConfirmPIN(uint32_t pin) { return bt_confirm_pin_callback(pin); };
@@ -117,7 +126,9 @@ void BLESerial::begin(const char *name) {
 
   ble_server = BLEDevice::createServer();
   ble_server->setCallbacks(this);
-  BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);
+  #if defined(CONFIG_BLUEDROID_ENABLED)
+    BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);
+  #endif
   BLEDevice::setSecurityCallbacks(this);
 
   SetupSerialService();
@@ -150,17 +161,31 @@ void BLESerial::onWrite(BLECharacteristic *characteristic) {
 void BLESerial::SetupSerialService() {
   SerialService = ble_server->createService(BLE_SERIAL_SERVICE_UUID);
 
-  RxCharacteristic = SerialService->createCharacteristic(BLE_RX_UUID, BLECharacteristic::PROPERTY_WRITE);
-  RxCharacteristic->setAccessPermissions(ESP_GATT_PERM_WRITE_ENC_MITM);
-  RxCharacteristic->addDescriptor(new BLE2902());
-  RxCharacteristic->setWriteProperty(true);
-  RxCharacteristic->setCallbacks(this);
+  #if defined(CONFIG_NIMBLE_ENABLED)
+    RxCharacteristic = SerialService->createCharacteristic(BLE_RX_UUID,
+        BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_ENC | BLECharacteristic::PROPERTY_WRITE_AUTHEN);
+    RxCharacteristic->addDescriptor(new BLE2902());
+    RxCharacteristic->setWriteProperty(true);
+    RxCharacteristic->setCallbacks(this);
 
-  TxCharacteristic = SerialService->createCharacteristic(BLE_TX_UUID, BLECharacteristic::PROPERTY_NOTIFY);
-  TxCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM);
-  TxCharacteristic->addDescriptor(new BLE2902());
-  TxCharacteristic->setNotifyProperty(true);
-  TxCharacteristic->setReadProperty(true);
+    TxCharacteristic = SerialService->createCharacteristic(BLE_TX_UUID,
+        BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_READ_ENC | BLECharacteristic::PROPERTY_READ_AUTHEN);
+    TxCharacteristic->addDescriptor(new BLE2902());
+    TxCharacteristic->setNotifyProperty(true);
+    TxCharacteristic->setReadProperty(true);
+  #else
+    RxCharacteristic = SerialService->createCharacteristic(BLE_RX_UUID, BLECharacteristic::PROPERTY_WRITE);
+    RxCharacteristic->setAccessPermissions(ESP_GATT_PERM_WRITE_ENC_MITM);
+    RxCharacteristic->addDescriptor(new BLE2902());
+    RxCharacteristic->setWriteProperty(true);
+    RxCharacteristic->setCallbacks(this);
+
+    TxCharacteristic = SerialService->createCharacteristic(BLE_TX_UUID, BLECharacteristic::PROPERTY_NOTIFY);
+    TxCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM);
+    TxCharacteristic->addDescriptor(new BLE2902());
+    TxCharacteristic->setNotifyProperty(true);
+    TxCharacteristic->setReadProperty(true);
+  #endif
 
   SerialService->start();
 }

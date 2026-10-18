@@ -96,7 +96,11 @@ public:
   uint32_t onPassKeyRequest();
   void onPassKeyNotify(uint32_t passkey);
   bool onSecurityRequest();
+  #if defined(CONFIG_BLUEDROID_ENABLED)
   void onAuthenticationComplete(esp_ble_auth_cmpl_t);
+  #elif defined(CONFIG_NIMBLE_ENABLED)
+  void onAuthenticationComplete(ble_gap_conn_desc *desc);
+  #endif
   bool onConfirmPIN(uint32_t pin);
 
   bool connected();

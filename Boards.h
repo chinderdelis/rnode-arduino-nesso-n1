@@ -70,6 +70,11 @@
   #define MODEL_DE            0xDE // Xiao ESP32S3 with Wio-SX1262 module, 433 MHz
   #define MODEL_DD            0xDD // Xiao ESP32S3 with Wio-SX1262 module, 868 MHz
 
+  #define PRODUCT_NESSO_N1    0xEC
+  #define BOARD_NESSO_N1      0x43 // Arduino Nesso N1 (M5Stack)
+  #define MODEL_EF            0xEF // Nesso N1, 868/915 MHz with SX1262
+  #define MODEL_F1            0xF1 // Nesso N1, 433 MHz with SX1262
+
   #define PRODUCT_T32_10      0xB2
   #define BOARD_LORA32_V1_0   0x39
   #define MODEL_BA            0xBA // LilyGO T3 v1.0, 433 MHz
@@ -144,6 +149,8 @@
       #define MODEM SX1262
     #elif BOARD_MODEL == BOARD_GENERIC_NRF52
       #define MODEM SX1262
+    #elif BOARD_MODEL == BOARD_NESSO_N1
+      #define MODEM SX1262
     #else
       #define MODEM SX1276
     #endif
@@ -167,6 +174,7 @@
   #define HAS_LORA_LNA false
   #define PIN_DISP_SLEEP -1
   #define VALIDATE_FIRMWARE true
+  #define HAS_RADIO_EXPANDER false
 
   #if defined(ENABLE_TCXO)
       #define HAS_TCXO true
@@ -712,6 +720,59 @@
           const int pin_led_rx = 48;
           const int pin_led_tx = 48;
         #endif
+      #endif
+
+    #elif BOARD_MODEL == BOARD_NESSO_N1
+      #define IS_ESP32_C6 true
+      #define MODEM SX1262
+      #define DIO2_AS_RF_SWITCH true
+      #define HAS_BUSY true
+      #define HAS_TCXO true
+      #define HAS_BLE true
+      #define HAS_DISPLAY true
+      #define DISPLAY_SCALE 2
+      #define HAS_RADIO_EXPANDER true
+
+      #define HAS_CONSOLE false
+      #define HAS_WIFI false
+      #define HAS_BLUETOOTH false
+      #define HAS_PMU true
+      #define HAS_NP false
+      #define HAS_SD false
+      #define HAS_EEPROM true
+
+      #define HAS_INPUT true
+      #define HAS_SLEEP false
+
+      // Primary user button (KEY1) is wired to the
+      // PI4IOE5V6408 I2C expander, not to a GPIO.
+      const int pin_btn_usr1 = 0;
+
+      // SX1262 pins via GPIO (direct)
+      const int pin_cs = 23;      // NSS
+      const int pin_reset = -1;   // handled via I2C expander PI4IOE5V6408
+      const int pin_sclk = 20;
+      const int pin_mosi = 21;
+      const int pin_miso = 22;
+      const int pin_dio = 15;    // DIO1
+      const int pin_busy = 19;
+      const int pin_tcxo_enable = -1;
+
+      // I2C for expander/PMU etc
+      #define I2C_SDA 10
+      #define I2C_SCL 8
+
+      // Display (ST7789)
+      #define DISPLAY_DC 16
+      #define DISPLAY_CS 17
+      #define DISPLAY_MOSI 21
+      #define DISPLAY_MISO -1
+      #define DISPLAY_CLK 20
+      #define DISPLAY_BL_PIN 9 // handled via expander or defined separately
+
+      #if HAS_NP == false
+        const int pin_led_rx = 9; // use as indicator if desired
+        const int pin_led_tx = 9;
       #endif
 
     #else

@@ -16,8 +16,12 @@
 #include "Graphics.h"
 #include <Adafruit_GFX.h>
 
+#if BOARD_MODEL == BOARD_NESSO_N1
+  #include "NessoN1.h"
+#endif
+
 #if BOARD_MODEL != BOARD_TECHO
-  #if BOARD_MODEL == BOARD_TDECK
+  #if BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_NESSO_N1
     #include <Adafruit_ST7789.h>
   #elif BOARD_MODEL == BOARD_HELTEC_T114
     #include "ST7789.h"
@@ -96,6 +100,10 @@
   #define SCL_OLED 6
   #define SDA_OLED 5
   #define DISP_CUSTOM_ADDR true
+#elif BOARD_MODEL == BOARD_NESSO_N1
+  #define DISP_RST -1
+  #define DISP_ADDR -1
+  #define DISP_CUSTOM_ADDR false
 #else
   #define DISP_RST -1
   #define DISP_ADDR 0x3C
@@ -104,7 +112,7 @@
 
 #define SMALL_FONT &Org_01
 
-#if BOARD_MODEL == BOARD_TDECK
+#if BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_NESSO_N1
   Adafruit_ST7789 display = Adafruit_ST7789(DISPLAY_CS, DISPLAY_DC, -1);
   #define SSD1306_WHITE ST77XX_WHITE
   #define SSD1306_BLACK ST77XX_BLACK
@@ -209,6 +217,18 @@ void update_area_positions() {
       p_as_x = 64;
       p_as_y = 0;
     }
+  #elif BOARD_MODEL == BOARD_NESSO_N1
+    if (disp_mode == DISP_MODE_PORTRAIT) {
+      p_ad_x = 4;
+      p_ad_y = 4;
+      p_as_x = 4;
+      p_as_y = 4+128;
+    } else if (disp_mode == DISP_MODE_LANDSCAPE) {
+      p_ad_x = -8;
+      p_ad_y = 3;
+      p_as_x = 120;
+      p_as_y = 3;
+    }
   #else
     if (disp_mode == DISP_MODE_PORTRAIT) {
       p_ad_x = 0 * DISPLAY_SCALE;
@@ -230,6 +250,10 @@ uint8_t display_contrast = 0x00;
   }
 #elif BOARD_MODEL == BOARD_HELTEC_T114
   void set_contrast(ST7789Spi *display, uint8_t value) { }
+#elif BOARD_MODEL == BOARD_NESSO_N1
+  void set_contrast(Adafruit_ST7789 *display, uint8_t value) {
+    nesso_lcd_backlight(value != 0);
+  }
 #elif BOARD_MODEL == BOARD_TECHO
   void set_contrast(void *display, uint8_t value) {
     if (value == 0) { analogWrite(pin_backlight, 0); }
@@ -323,6 +347,11 @@ bool display_init() {
       Wire.begin(SDA_OLED, SCL_OLED);
     #elif BOARD_MODEL == BOARD_XIAO_S3
       Wire.begin(SDA_OLED, SCL_OLED);
+    #elif BOARD_MODEL == BOARD_NESSO_N1
+      nesso_lcd_reset();
+      display.init(240, 135);
+      display.setSPISpeed(40000000);
+      nesso_lcd_backlight(true);
     #endif
 
     #if HAS_EEPROM
@@ -371,6 +400,9 @@ bool display_init() {
     #elif BOARD_MODEL == BOARD_TDECK
     display.init(240, 320);
     display.setSPISpeed(80e6);
+    #elif BOARD_MODEL == BOARD_NESSO_N1
+    // Display was initialised above via the SPI GPIO expander reset path
+    if (false) {
     #elif BOARD_MODEL == BOARD_HELTEC_T114
     display.init();
     // set white as default pixel colour for Heltec T114
@@ -434,6 +466,9 @@ bool display_init() {
         #elif BOARD_MODEL == BOARD_TECHO
           disp_mode = DISP_MODE_PORTRAIT;
           display.setRotation(3);
+        #elif BOARD_MODEL == BOARD_NESSO_N1
+          disp_mode = DISP_MODE_LANDSCAPE;
+          display.setRotation(0);
         #else
           disp_mode = DISP_MODE_PORTRAIT;
           display.setRotation(3);
@@ -1072,6 +1107,8 @@ void update_display(bool blank = false) {
         display.clear();
         display.display();
         digitalWrite(PIN_T114_TFT_BLGT, HIGH);
+      #elif BOARD_MODEL == BOARD_NESSO_N1
+        display.fillScreen(SSD1306_BLACK);
       #elif BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_TECHO
         display.clearDisplay();
         display.display();
@@ -1093,7 +1130,7 @@ void update_display(bool blank = false) {
       #if BOARD_MODEL == BOARD_HELTEC_T114
         display.clear();
         digitalWrite(PIN_T114_TFT_BLGT, LOW);
-      #elif BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_TECHO
+      #elif BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_TECHO && BOARD_MODEL != BOARD_NESSO_N1
         display.clearDisplay();
       #endif
 
@@ -1118,7 +1155,7 @@ void update_display(bool blank = false) {
           last_epd_refresh = millis();
           epd_blanked = false;
         }
-      #elif BOARD_MODEL != BOARD_TDECK
+      #elif BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_NESSO_N1
         display.display();
       #endif
 

@@ -7,7 +7,7 @@
 #include "sx127x.h"
 
 #if MCU_VARIANT == MCU_ESP32
-  #if MCU_VARIANT == MCU_ESP32 and !defined(CONFIG_IDF_TARGET_ESP32S3)
+  #if MCU_VARIANT == MCU_ESP32 and !defined(CONFIG_IDF_TARGET_ESP32S3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
     #include "hal/wdt_hal.h"
   #endif
   #define ISR_VECT IRAM_ATTR

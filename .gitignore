@@ -7,3 +7,15 @@ Release/*.zip
 Release/*.json
 Console/build
 build/*
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Local build / editor artifacts
+compile_commands.json
+probe.d
+probe.o
+*.d
+.vscode/

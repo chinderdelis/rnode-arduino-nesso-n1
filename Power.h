@@ -180,8 +180,20 @@ float pmu_temperature = PMU_TEMP_MIN-1;
   bool bat_voltage_dropping = false;
   float bat_delay_v = 0;
   float bat_state_change_v = 0;
+#elif BOARD_MODEL == BOARD_NESSO_N1
+  #define BAT_V_MIN       3.0
+  #define BAT_V_MAX       4.2
+  #define BAT_SAMPLES     1
+  float bat_p_samples[BAT_SAMPLES];
+  float bat_v_samples[BAT_SAMPLES];
+  uint8_t bat_samples_count = 0;
+  int bat_discharging_samples = 0;
+  int bat_charging_samples = 0;
+  int bat_charged_samples = 0;
+  bool bat_voltage_dropping = false;
+  float bat_delay_v = 0;
+  float bat_state_change_v = 0;
 #endif
-
 uint32_t last_pmu_update = 0;
 uint8_t pmu_target_pps = 1;
 int pmu_update_interval = 1000/pmu_target_pps;
@@ -306,6 +318,41 @@ void measure_battery() {
       //   if (battery_state == BATTERY_STATE_CHARGED) { SerialBT.print("\n Battery is charged."); }
       //   SerialBT.print("\n");
       // }
+    }
+
+    }
+
+  #elif BOARD_MODEL == BOARD_NESSO_N1
+    if (nesso_battery_present()) {
+      battery_installed = true;
+      external_power = nesso_external_power();
+      battery_voltage = nesso_battery_voltage();
+      float soc = nesso_battery_soc();
+      int16_t current = nesso_battery_current();
+      if (battery_voltage < BAT_V_MIN) {
+        battery_percent = 0.0;
+      } else if (battery_voltage > BAT_V_MAX) {
+        battery_percent = 100.0;
+      } else {
+        battery_percent = ((battery_voltage-BAT_V_MIN) / (BAT_V_MAX-BAT_V_MIN))*100.0;
+      }
+      if (soc >= 0.0 && soc <= 100.0) { battery_percent = soc; }
+      if (battery_percent > 100.0) battery_percent = 100.0;
+      if (battery_percent < 0.0) battery_percent = 0.0;
+
+      if (external_power) {
+        if (battery_percent >= 99.5 || nesso_battery_current() >= 0) {
+          battery_state = BATTERY_STATE_CHARGED;
+        } else {
+          battery_state = BATTERY_STATE_CHARGING;
+        }
+      } else {
+        battery_state = BATTERY_STATE_DISCHARGING;
+      }
+
+      battery_ready = true;
+    } else {
+      battery_ready = false;
     }
 
   #elif BOARD_MODEL == BOARD_TBEAM || BOARD_MODEL == BOARD_TBEAM_S_V1
@@ -443,6 +490,8 @@ bool init_pmu() {
     pinMode(pin_ctrl,OUTPUT);
     digitalWrite(pin_ctrl, HIGH);
     return true;
+  #elif BOARD_MODEL == BOARD_NESSO_N1
+    return nesso_battery_present();
   #elif BOARD_MODEL == BOARD_TBEAM
     Wire.begin(I2C_SDA, I2C_SCL);
 

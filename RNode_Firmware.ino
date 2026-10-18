@@ -56,12 +56,20 @@ char sbuf[128];
 
 #if MCU_VARIANT == MCU_ESP32 || MCU_VARIANT == MCU_NRF52
   bool packet_ready = false;
+  void update_csma_parameters();
 #endif
 
 void setup() {
   #if MCU_VARIANT == MCU_ESP32
     boot_seq();
     EEPROM.begin(EEPROM_SIZE);
+
+    #if HAS_RADIO_EXPANDER
+      // Initialise the I2C GPIO expanders that carry the LoRa reset,
+      // antenna switch and LNA enable lines (Arduino Nesso N1)
+      nesso_board_init();
+    #endif
+
     Serial.setRxBufferSize(CONFIG_UART_BUFFER_SIZE);
 
     #if BOARD_MODEL == BOARD_TDECK

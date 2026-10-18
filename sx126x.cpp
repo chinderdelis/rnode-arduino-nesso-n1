@@ -6,8 +6,12 @@
 #if MODEM == SX1262
 #include "sx126x.h"
 
+#if HAS_RADIO_EXPANDER
+  #include "NessoN1.h"
+#endif
+
 #if MCU_VARIANT == MCU_ESP32
-  #if MCU_VARIANT == MCU_ESP32 and !defined(CONFIG_IDF_TARGET_ESP32S3)
+  #if MCU_VARIANT == MCU_ESP32 and !defined(CONFIG_IDF_TARGET_ESP32S3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
     #include "soc/rtc_wdt.h"
   #endif
   #define ISR_VECT IRAM_ATTR
@@ -133,7 +137,7 @@ bool sx126x::preInit() {
   pinMode(_ss, OUTPUT);
   digitalWrite(_ss, HIGH);
   
-  #if BOARD_MODEL == BOARD_T3S3 || BOARD_MODEL == BOARD_HELTEC32_V3 || BOARD_MODEL == BOARD_HELTEC32_V4 || BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_XIAO_S3
+  #if BOARD_MODEL == BOARD_T3S3 || BOARD_MODEL == BOARD_HELTEC32_V3 || BOARD_MODEL == BOARD_HELTEC32_V4 || BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_XIAO_S3 || BOARD_MODEL == BOARD_NESSO_N1
     SPI.begin(pin_sclk, pin_miso, pin_mosi, pin_cs);
   #elif BOARD_MODEL == BOARD_TECHO
     SPI.setPins(pin_miso, pin_sclk, pin_mosi);
@@ -299,6 +303,10 @@ void sx126x::setPacketParams(long preamble_symbols, uint8_t headermode, uint8_t 
 }
 
 void sx126x::reset(void) {
+  #if HAS_RADIO_EXPANDER
+    // LoRa reset line is routed through an I2C GPIO expander
+    nesso_lora_reset();
+  #endif
   if (_reset != -1) {
     pinMode(_reset, OUTPUT);
     digitalWrite(_reset, LOW);
@@ -703,6 +711,8 @@ void sx126x::enableTCXO() {
       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
     #elif BOARD_MODEL == BOARD_HELTEC32_V4
       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
+    #elif BOARD_MODEL == BOARD_NESSO_N1
+      uint8_t buf[4] = {MODE_TCXO_3_0V_6X, 0x00, 0x00, 0xFF};
     #endif
     executeOpcode(OP_DIO3_TCXO_CTRL_6X, buf, 4);
   #endif

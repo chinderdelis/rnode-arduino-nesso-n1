@@ -15,6 +15,10 @@
 
 #include "Config.h"
 
+#if HAS_RADIO_EXPANDER
+  #include "NessoN1.h"
+#endif
+
 #if HAS_EEPROM
     #include <EEPROM.h>
 #elif PLATFORM == PLATFORM_NRF52
@@ -326,7 +330,7 @@ uint8_t boot_vector = 0x00;
 		void led_tx_off() { digitalWrite(pin_led_tx, LED_OFF); }
 		void led_id_on()  { }
 		void led_id_off() { }
-	#elif BOARD_MODEL == BOARD_HUZZAH32
+  #elif BOARD_MODEL == BOARD_HUZZAH32
 		void led_rx_on()  { digitalWrite(pin_led_rx, HIGH); }
 		void led_rx_off() {	digitalWrite(pin_led_rx, LOW); }
 		void led_tx_on()  { digitalWrite(pin_led_tx, HIGH); }
@@ -340,6 +344,13 @@ uint8_t boot_vector = 0x00;
 		void led_tx_off() { digitalWrite(pin_led_tx, LOW); }
 		void led_id_on()  { }
 		void led_id_off() { }
+	#elif BOARD_MODEL == BOARD_NESSO_N1
+		void led_rx_on()  { nesso_led(true); }
+		void led_rx_off() { nesso_led(false); }
+		void led_tx_on()  { nesso_led(true); }
+		void led_tx_off() { nesso_led(false); }
+		void led_id_on()  { nesso_led(true); }
+		void led_id_off() { nesso_led(false); }
 	#endif
 #elif MCU_VARIANT == MCU_NRF52
     #if HAS_NP == true

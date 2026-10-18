@@ -20,7 +20,6 @@
 
   #define PRESSED LOW
   #define RELEASED HIGH
-
   #define EVENT_ALL                 0x00
   #define EVENT_CLICKS              0x01
   #define EVENT_BUTTON_DOWN         0x11
@@ -40,8 +39,18 @@
   // Forward declaration
   void button_event(uint8_t event, unsigned long duration);
 
+  int read_input_button() {
+    #if BOARD_MODEL == BOARD_NESSO_N1
+      return nesso_button_read();
+    #else
+      return digitalRead(PIN_BUTTON);
+    #endif
+  }
+
   void input_init() {
-    pinMode(PIN_BUTTON, INPUT_PULLUP);
+    #if BOARD_MODEL != BOARD_NESSO_N1
+      pinMode(PIN_BUTTON, INPUT_PULLUP);
+    #endif
   }
 
   void input_get_all_events() {
@@ -53,7 +62,7 @@
   }
 
   void input_read() {
-    int button_reading = digitalRead(PIN_BUTTON);
+    int button_reading = read_input_button();
     if (button_reading != debounce_state) {
       button_debounce_last = millis();
       debounce_state = button_reading;

@@ -25,8 +25,13 @@
     #include "esp_bt_device.h"
     BluetoothSerial SerialBT;
   #elif HAS_BLE == true
-    #include "esp_bt_main.h"
-    #include "esp_bt_device.h"
+    #if defined(CONFIG_BLUEDROID_ENABLED)
+      #include "esp_bt_main.h"
+      #include "esp_bt_device.h"
+    #elif defined(CONFIG_NIMBLE_ENABLED)
+      #include "esp_mac.h"
+      #include <host/ble_store.h>
+    #endif
     #include "BLESerial.h"
     BLESerial SerialBT;
   #endif
@@ -210,11 +215,16 @@ char bt_devname[11];
 
     void bt_debond_all() {
       // Serial.println("Debonding all");
-      int dev_num = esp_ble_get_bond_device_num();
-      esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
-      esp_ble_get_bond_device_list(&dev_num, dev_list);
-      for (int i = 0; i < dev_num; i++) { esp_ble_remove_bond_device(dev_list[i].bd_addr); }
-      free(dev_list);
+      #if defined(CONFIG_BLUEDROID_ENABLED)
+        int dev_num = esp_ble_get_bond_device_num();
+        esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
+        esp_ble_get_bond_device_list(&dev_num, dev_list);
+        for (int i = 0; i < dev_num; i++) { esp_ble_remove_bond_device(dev_list[i].bd_addr); }
+        free(dev_list);
+      #elif defined(CONFIG_NIMBLE_ENABLED)
+        ble_store_util_delete_all(BLE_STORE_OBJ_TYPE_PEER_SEC, NULL);
+        ble_store_util_delete_all(BLE_STORE_OBJ_TYPE_OUR_SEC, NULL);
+      #endif
     }
 
     void bt_enable_pairing() {
@@ -281,8 +291,14 @@ char bt_devname[11];
         }
     }
 
+    #if defined(CONFIG_BLUEDROID_ENABLED)
     void bt_authentication_complete_callback(esp_ble_auth_cmpl_t auth_result) {
       if (auth_result.success == true) {
+    #elif defined(CONFIG_NIMBLE_ENABLED)
+    void bt_authentication_complete_callback(ble_gap_conn_desc *desc) {
+      bool auth_success = (desc != NULL) && desc->sec_state.encrypted && desc->sec_state.authenticated;
+      if (auth_success == true) {
+    #endif
         // Serial.println("Authentication success");
         ble_authenticated = true;
         if (bt_state == BT_STATE_PAIRING) {
@@ -326,26 +342,29 @@ char bt_devname[11];
           bt_enabled = false;
         }
         if (btStart()) {
-          if (esp_bluedroid_init() == ESP_OK) {
-            if (esp_bluedroid_enable() == ESP_OK) {
-              const uint8_t* bda_ptr = esp_bt_dev_get_address();
-              char *data = (char*)malloc(BT_DEV_ADDR_LEN+1);
-              for (int i = 0; i < BT_DEV_ADDR_LEN; i++) {
-                  data[i] = bda_ptr[i];
-              }
-              data[BT_DEV_ADDR_LEN] = EEPROM.read(eeprom_addr(ADDR_SIGNATURE));
-              unsigned char *hash = MD5::make_hash(data, BT_DEV_ADDR_LEN);
-              memcpy(bt_dh, hash, BT_DEV_HASH_LEN);
-              sprintf(bt_devname, "RNode %02X%02X", bt_dh[14], bt_dh[15]);
-              free(data);
+          #if defined(CONFIG_BLUEDROID_ENABLED)
+            if (esp_bluedroid_init() != ESP_OK) { return false; }
+            if (esp_bluedroid_enable() != ESP_OK) { return false; }
+            const uint8_t* bda_ptr = esp_bt_dev_get_address();
+          #elif defined(CONFIG_NIMBLE_ENABLED)
+            uint8_t bda_buf[BT_DEV_ADDR_LEN];
+            esp_read_mac(bda_buf, ESP_MAC_BT);
+            const uint8_t* bda_ptr = bda_buf;
+          #endif
+          char *data = (char*)malloc(BT_DEV_ADDR_LEN+1);
+          for (int i = 0; i < BT_DEV_ADDR_LEN; i++) {
+              data[i] = bda_ptr[i];
+          }
+          data[BT_DEV_ADDR_LEN] = EEPROM.read(eeprom_addr(ADDR_SIGNATURE));
+          unsigned char *hash = MD5::make_hash(data, BT_DEV_ADDR_LEN);
+          memcpy(bt_dh, hash, BT_DEV_HASH_LEN);
+          sprintf(bt_devname, "RNode %02X%02X", bt_dh[14], bt_dh[15]);
+          free(data);
 
-              bt_security_setup();
+          bt_security_setup();
 
-              bt_ready = true;
-              return true;
-
-            } else { return false; }
-          } else { return false; }
+          bt_ready = true;
+          return true;
         } else { return false; }
       } else { return false; }
     }
@@ -356,24 +375,33 @@ char bt_devname[11];
       uint32_t passkey = pairing_pin;
       // Serial.printf("Passkey is %d\n", passkey);
 
-      uint8_t key_size = 16;
-      uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
-      uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+      #if defined(CONFIG_BLUEDROID_ENABLED)
+        uint8_t key_size = 16;
+        uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+        uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
 
-      esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
-      uint8_t auth_option = ESP_BLE_ONLY_ACCEPT_SPECIFIED_AUTH_ENABLE;
-      uint8_t oob_support = ESP_BLE_OOB_DISABLE;
+        esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
+        uint8_t auth_option = ESP_BLE_ONLY_ACCEPT_SPECIFIED_AUTH_ENABLE;
+        uint8_t oob_support = ESP_BLE_OOB_DISABLE;
 
-      esp_ble_io_cap_t iocap = ESP_IO_CAP_OUT;
+        esp_ble_io_cap_t iocap = ESP_IO_CAP_OUT;
 
-      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &passkey, sizeof(uint32_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE, &iocap, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_ONLY_ACCEPT_SPECIFIED_SEC_AUTH, &auth_option, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_OOB_SUPPORT, &oob_support, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+        esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &passkey, sizeof(uint32_t));
+        esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, sizeof(uint8_t));
+        esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE, &iocap, sizeof(uint8_t));
+        esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
+        esp_ble_gap_set_security_param(ESP_BLE_SM_ONLY_ACCEPT_SPECIFIED_SEC_AUTH, &auth_option, sizeof(uint8_t));
+        esp_ble_gap_set_security_param(ESP_BLE_SM_OOB_SUPPORT, &oob_support, sizeof(uint8_t));
+        esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
+        esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+      #elif defined(CONFIG_NIMBLE_ENABLED)
+        BLESecurity::setAuthenticationMode(true, true, true);
+        BLESecurity::setCapability(ESP_IO_CAP_OUT);
+        BLESecurity::setKeySize(16);
+        BLESecurity::setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+        BLESecurity::setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+        BLESecurity::setPassKey(true, passkey);
+      #endif
     }
 
     void update_bt() {
