@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: ✨ Feature Request or Idea
-    url: https://github.com/markqvist/Reticulum/discussions/new?category=ideas
-    about: Propose and discuss features and ideas
-  - name: 💬 Questions, Help & Discussion
-    about: Ask anything, or get help
-    url: https://github.com/markqvist/Reticulum/discussions/new/choose
-  - name: 📖 Read the Reticulum Manual
-    url: https://markqvist.github.io/Reticulum/manual/
-    about: The complete documentation for Reticulum
+  - name: Upstream RNode Firmware issues
+    url: https://github.com/markqvist/RNode_Firmware/issues
+    about: Report generic RNode firmware or upstream tooling problems here.
+  - name: Reticulum and RNode discussions
+    url: https://github.com/markqvist/Reticulum/discussions
+    about: Ask general Reticulum, RNode or radio questions here.
+  - name: Read the Nesso N1 port documentation
+    url: https://github.com/chinderdelis/rnode-arduino-nesso-n1/blob/master/README.md
+    about: Check verified features, known limitations, build and flash instructions.

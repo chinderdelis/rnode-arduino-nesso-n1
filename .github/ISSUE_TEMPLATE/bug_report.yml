@@ -1,0 +1,113 @@
+name: Bug report
+description: Report a reproducible problem with the Nesso N1 port
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. This port is experimental, so first check
+        the verified and not-verified sections in the README, then search the
+        existing issues.
+
+        Do not include Wi-Fi passwords, private keys, API tokens, full flash
+        dumps, MAC addresses or other sensitive data.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight checks
+      options:
+        - label: I read the README and this feature is not listed as unimplemented.
+          required: true
+        - label: I searched the existing issues.
+          required: true
+        - label: I am reporting a problem with this Nesso N1 port, not generic upstream RNode behavior.
+          required: true
+
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Firmware version and hash
+      description: RNode version, release tag or commit, and embedded firmware hash if known.
+      placeholder: "1.56, nesso-n1-fw-1.56, 127d0a50..."
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware
+      description: Nesso N1 revision, host OS, USB port, and any connected radio or BLE hardware.
+      placeholder: "Arduino Nesso N1, Linux 6.x, /dev/ttyACM0"
+    validations:
+      required: true
+
+  - type: input
+    id: tool-versions
+    attributes:
+      label: Tool versions
+      description: PlatformIO, esptool and Python versions used.
+      placeholder: "PlatformIO 6.x, esptool 4.7.0, Python 3.12"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Boot or USB serial
+        - Provisioning or EEPROM
+        - Display
+        - Buttons
+        - LoRa radio
+        - BLE
+        - Battery or power
+        - Build or flashing
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the exact commands, configuration and actions.
+      placeholder: |
+        1. Flash with ...
+        2. Provision with ...
+        3. Send ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove secrets, MAC addresses and device-specific data before pasting.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Radio configuration, second LoRa peer, BLE host or anything else relevant.
+    validations:
+      required: false

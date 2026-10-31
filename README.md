@@ -231,10 +231,16 @@ credentials, Wi-Fi passwords, private keys or MAC-address data.
 ## Contributing
 
 Issues, test reports and pull requests are welcome, especially from people who
-can test the remaining items with a second LoRa node or a BLE host. The upstream
-project remains the authoritative source for generic RNode behavior:
+can test the remaining items with a second LoRa node or a BLE host.
+
+Before contributing, read [`CONTRIBUTING.md`](./CONTRIBUTING.md). Report security
+problems privately as described in [`SECURITY.md`](./SECURITY.md). Project
+participation follows [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
+
+The upstream project remains the authoritative source for generic RNode behavior:
 
 - Upstream firmware: <https://github.com/markqvist/RNode_Firmware>
+- Upstream README: [`README_UPSTREAM.md`](./README_UPSTREAM.md)
 - Reticulum: <https://reticulum.network>
 
 ## License

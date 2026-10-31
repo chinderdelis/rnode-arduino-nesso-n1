@@ -1,0 +1,69 @@
+name: Hardware test report
+description: Report a successful or failed hardware validation
+title: "[Test]: "
+labels: ["hardware-test"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Hardware test reports are valuable, especially for LoRa receive, BLE data
+        transport, display modes and power management. State clearly what was
+        tested and what was not.
+
+        Do not include Wi-Fi passwords, private keys, API tokens, full flash
+        dumps, MAC addresses or other sensitive data.
+
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Firmware version and hash
+      description: RNode version, release tag or commit, and embedded firmware hash if known.
+      placeholder: "1.56, nesso-n1-fw-1.56, 127d0a50..."
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware setup
+      description: Board revision, host platform, second LoRa node or BLE host used.
+      placeholder: "Nesso N1 + second SX1262 node, Linux host, /dev/ttyACM0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: tested
+    attributes:
+      label: What was tested
+      description: List each feature and the observed result.
+      placeholder: |
+        LoRa receive: 20 packets received with RSSI/SNR ...
+        BLE KISS: paired and exchanged ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Radio and device configuration
+      description: Frequency, bandwidth, spreading factor, coding rate, TX power, region and anything else relevant.
+      placeholder: "869.525 MHz, BW125, SF8, CR5, TXP14, EU868"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove secrets, MAC addresses and device-specific data before pasting.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: limitations
+    attributes:
+      label: Limitations or follow-up
+      description: What remains untested, and what should be investigated next?
+    validations:
+      required: false
