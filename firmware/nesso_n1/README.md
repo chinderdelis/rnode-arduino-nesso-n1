@@ -19,9 +19,19 @@ remaining limitations.
 ## Version
 
 - RNode firmware: `1.56` (`0x0156`)
-- Board model: `0x43`
+- Compile-time board ID: `0x43` (selects the Nesso pin/peripheral map; not the EEPROM value)
+- EEPROM product/model: `0xEC` / `0xEF` (868/915 MHz); `0xF1` is the 433 MHz model
 - App image SHA-256: `d952dc9a19f38227f9ea64acaf822d9c9b1960c0835f949a25ec4bd99c420589`
 - Embedded firmware hash: `127d0a5026b57f2913bbec5a975646f5036788058a04244e17a152c89aa13dfb`
+
+The app image SHA-256 covers the whole `firmware.bin`, including its final
+32 bytes. The embedded firmware hash is the SHA-256 of the image **excluding**
+those final 32 bytes; that is the value stored as the RNode firmware-hash
+target during provisioning.
+
+After flashing the factory image, NVS (provisioning) is erased, so provision the
+device again. Flashing only `firmware.bin` at `0x10000` preserves an existing
+provisioning.
 
 ## Flash
 
