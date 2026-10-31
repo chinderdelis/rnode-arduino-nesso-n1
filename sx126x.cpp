@@ -98,6 +98,9 @@
 #elif defined(NRF52840_XXAA)
   extern SPIClass spiModem;
   #define SPI spiModem
+#elif BOARD_MODEL == BOARD_NESSO_N1
+  extern SPIClass nessoSPI;
+  #define SPI nessoSPI
 #endif
 
 #if HAS_LORA_PA
@@ -347,6 +350,12 @@ int sx126x::begin(long frequency) {
   if (!_preinit_done) { if (!preInit()) { return false; } }
   if (_rxen != -1) { pinMode(_rxen, OUTPUT); }
 
+  #if BOARD_MODEL == BOARD_NESSO_N1
+    // The Nesso N1 module is wired for the SX1262 internal LDO regulator.
+    uint8_t regulator_mode = 0x00;
+    executeOpcode(OP_REGULATOR_MODE_6X, &regulator_mode, 1);
+  #endif
+
   calibrate();
   calibrate_image(frequency);
   enableTCXO();
@@ -439,7 +448,16 @@ int sx126x::begin(long frequency) {
   return 1;
 }
 
-void sx126x::end() { sleep(); SPI.end(); _preinit_done = false; }
+void sx126x::end() {
+  sleep();
+  // On the Nesso N1 the ST7789 display shares this SPI bus with the radio.
+  // Tearing the bus down here would null out SPIClass::_spi and make the
+  // display fault on its next access, so keep the shared bus alive.
+  #if BOARD_MODEL != BOARD_NESSO_N1
+    SPI.end();
+  #endif
+  _preinit_done = false;
+}
 
 int sx126x::beginPacket(int implicitHeader) {
   #if HAS_LORA_PA
@@ -467,6 +485,9 @@ int sx126x::beginPacket(int implicitHeader) {
 
 int sx126x::endPacket() {
   setPacketParams(_preambleLength, _implicitHeaderMode, _payloadLength, _crcMode);
+  #if BOARD_MODEL == BOARD_NESSO_N1
+    nesso_rf_tx();
+  #endif
   uint8_t timeout[3] = {0}; // Put in single TX mode
   executeOpcode(OP_TX_6X, timeout, 3);
 
@@ -492,6 +513,9 @@ int sx126x::endPacket() {
   mask[0] = 0x00;
   mask[1] = IRQ_TX_DONE_MASK_6X;
   executeOpcode(OP_CLEAR_IRQ_STATUS_6X, mask, 2);
+  #if BOARD_MODEL == BOARD_NESSO_N1
+    nesso_rf_rx();
+  #endif
   if (timed_out) { return 0; } else { return 1; }
 }
 
@@ -682,6 +706,9 @@ void sx126x::receive(int size) {
   } else { explicitHeaderMode(); }
 
   if (_rxen != -1) { rxAntEnable(); }
+  #if BOARD_MODEL == BOARD_NESSO_N1
+    nesso_rf_rx();
+  #endif
   uint8_t mode[3] = {0xFF, 0xFF, 0xFF}; // Continuous mode
   executeOpcode(OP_RX_6X, mode, 3);
 }

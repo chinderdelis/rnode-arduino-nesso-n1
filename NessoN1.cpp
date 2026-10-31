@@ -16,10 +16,14 @@
 
 #define NESSO_I2C_FREQ 400000
 
+// See NessoN1.h: an explicit bus-0 (FSPI) SPI instance, since the C6 has only
+// one general-purpose SPI peripheral (bus index 0).
+SPIClass nessoSPI(FSPI);
+
 PI4IOE5V6408 nesso_exp0;
 PI4IOE5V6408 nesso_exp1;
 
-PI4IOE5V6408::PI4IOE5V6408() : _addr(0), _dir(0), _out(0), _present(false) { }
+PI4IOE5V6408::PI4IOE5V6408() : _addr(0), _present(false) { }
 
 uint8_t PI4IOE5V6408::read_reg(uint8_t reg) {
   Wire.beginTransmission(_addr);
@@ -37,33 +41,58 @@ void PI4IOE5V6408::write_reg(uint8_t reg, uint8_t value) {
   Wire.endTransmission();
 }
 
+void PI4IOE5V6408::write_bit(uint8_t reg, uint8_t bit, bool value) {
+  uint8_t reg_value = read_reg(reg);
+  if (value) { reg_value |= (1 << bit); }
+  else       { reg_value &= ~(1 << bit); }
+  write_reg(reg, reg_value);
+}
+
 bool PI4IOE5V6408::begin(uint8_t addr) {
   _addr = addr;
-  _dir = 0x00;
-  _out = 0x00;
 
   uint8_t id = read_reg(PI4IOE_REG_CTRL);
   // Manufacturer ID 0b101 + firmware rev 0b000 -> upper 6 bits must be 0xA0
   _present = ((id & 0xFC) == 0xA0);
   if (!_present) { return false; }
 
-  write_reg(PI4IOE_REG_HIZ, 0x00);       // totem-pole outputs on all pins
+  // Software reset, as done by the official Arduino_Nesso_N1 library.
+  write_reg(PI4IOE_REG_CTRL, 0x01);
+  delay(10);
+
+  write_reg(PI4IOE_REG_IN_DEF, 0xFF);    // input default high
   write_reg(PI4IOE_REG_INT_MASK, 0xFF);  // interrupts disabled
   write_reg(PI4IOE_REG_PUD_EN, 0x00);    // no pull-up/pull-down
-  write_reg(PI4IOE_REG_DIR, _dir);       // all inputs for now
-  write_reg(PI4IOE_REG_OUT, _out);
+  write_reg(PI4IOE_REG_PUD_SEL, 0x00);
+  write_reg(PI4IOE_REG_DIR, 0x00);       // all inputs for now
+  write_reg(PI4IOE_REG_OUT, 0x00);
 
   return true;
 }
 
 void PI4IOE5V6408::pinMode(uint8_t pin, uint8_t mode) {
-  if (mode == OUTPUT) { _dir |= (1 << pin); } else { _dir &= ~(1 << pin); }
-  write_reg(PI4IOE_REG_DIR, _dir);
+  if (!_present) { return; }
+
+  if (mode == OUTPUT) {
+    write_bit(PI4IOE_REG_PUD_EN, pin, false);
+    write_bit(PI4IOE_REG_HIZ, pin, false);
+    write_bit(PI4IOE_REG_DIR, pin, true);
+  } else {
+    write_bit(PI4IOE_REG_DIR, pin, false);
+    if (mode == INPUT_PULLUP) {
+      write_bit(PI4IOE_REG_PUD_SEL, pin, true);
+      write_bit(PI4IOE_REG_PUD_EN, pin, true);
+    } else if (mode == INPUT_PULLDOWN) {
+      write_bit(PI4IOE_REG_PUD_SEL, pin, false);
+      write_bit(PI4IOE_REG_PUD_EN, pin, true);
+    } else {
+      write_bit(PI4IOE_REG_PUD_EN, pin, false);
+    }
+  }
 }
 
 void PI4IOE5V6408::digitalWrite(uint8_t pin, uint8_t value) {
-  if (value == HIGH) { _out |= (1 << pin); } else { _out &= ~(1 << pin); }
-  write_reg(PI4IOE_REG_OUT, _out);
+  write_bit(PI4IOE_REG_OUT, pin, value == HIGH);
 }
 
 int PI4IOE5V6408::digitalRead(uint8_t pin) {
@@ -76,9 +105,10 @@ void nesso_board_init() {
   nesso_exp0.begin(PI4IOE_ADDR_LOW);
   nesso_exp1.begin(PI4IOE_ADDR_HIGH);
 
-  // Expander 0: buttons as inputs, LoRa control lines as outputs
-  nesso_exp0.pinMode(NESSO_EXP0_KEY1, INPUT);
-  nesso_exp0.pinMode(NESSO_EXP0_KEY2, INPUT);
+  // Expander 0: buttons are active-low and need the internal pull-ups.
+  // The LoRa control lines are outputs.
+  nesso_exp0.pinMode(NESSO_EXP0_KEY1, INPUT_PULLUP);
+  nesso_exp0.pinMode(NESSO_EXP0_KEY2, INPUT_PULLUP);
   nesso_exp0.pinMode(NESSO_EXP0_LNA, OUTPUT);
   nesso_exp0.pinMode(NESSO_EXP0_ANT, OUTPUT);
   nesso_exp0.pinMode(NESSO_EXP0_NRST, OUTPUT);
@@ -91,10 +121,11 @@ void nesso_board_init() {
   nesso_exp1.pinMode(NESSO_EXP1_LED, OUTPUT);
   nesso_exp1.pinMode(NESSO_EXP1_VIN, INPUT);
 
-  // LCD out of reset, keep backlight off until the display driver is up
+  // LCD out of reset, keep backlight off until the display driver is up.
+  // POWEROFF is an active-high pulse: keep it LOW during normal operation.
   nesso_exp1.digitalWrite(NESSO_EXP1_LCD_RST, HIGH);
   nesso_exp1.digitalWrite(NESSO_EXP1_LCD_BL, LOW);
-  nesso_exp1.digitalWrite(NESSO_EXP1_PWR, HIGH);
+  nesso_exp1.digitalWrite(NESSO_EXP1_PWR, LOW);
 
   // Bring up the LoRa front-end: reset pulse, then antenna switch + LNA
   nesso_lora_reset();
@@ -109,11 +140,21 @@ void nesso_lora_reset() {
   delay(100);
 }
 
-void nesso_rf_enable() {
+void nesso_rf_rx() {
   // Antenna switch powered, LNA enabled for the receive path.
   // TX/RX direction is handled automatically by the SX1262 DIO2 RF switch.
   nesso_exp0.digitalWrite(NESSO_EXP0_ANT, HIGH);
   nesso_exp0.digitalWrite(NESSO_EXP0_LNA, HIGH);
+}
+
+void nesso_rf_enable() {
+  nesso_rf_rx();
+}
+
+void nesso_rf_tx() {
+  // The external LNA must be disabled while transmitting.
+  nesso_exp0.digitalWrite(NESSO_EXP0_ANT, HIGH);
+  nesso_exp0.digitalWrite(NESSO_EXP0_LNA, LOW);
 }
 
 void nesso_rf_disable() {

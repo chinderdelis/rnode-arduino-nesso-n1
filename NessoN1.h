@@ -18,6 +18,12 @@
   #if BOARD_MODEL == BOARD_NESSO_N1
 
     #include <Arduino.h>
+    #include <SPI.h>
+
+    // The ESP32-C6 exposes a single general-purpose SPI peripheral (bus 0 /
+    // FSPI). The SX1262 radio and the ST7789 display share it, so use one
+    // explicit bus-0 instance for both instead of the core's global `SPI`.
+    extern SPIClass nessoSPI;
 
     // PI4IOE5V6408 register map
     #define PI4IOE_ADDR_LOW   0x43
@@ -60,10 +66,9 @@
     private:
       void write_reg(uint8_t reg, uint8_t value);
       uint8_t read_reg(uint8_t reg);
+      void write_bit(uint8_t reg, uint8_t bit, bool value);
 
       uint8_t _addr;
-      uint8_t _dir;
-      uint8_t _out;
       bool _present;
     };
 
@@ -74,6 +79,8 @@
     void nesso_lora_reset();
     void nesso_rf_enable();
     void nesso_rf_disable();
+    void nesso_rf_tx();
+    void nesso_rf_rx();
     void nesso_led(bool on);
     void nesso_lcd_backlight(bool on);
     void nesso_lcd_reset();

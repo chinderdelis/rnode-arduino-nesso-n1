@@ -726,6 +726,8 @@
       #define IS_ESP32_C6 true
       #define MODEM SX1262
       #define DIO2_AS_RF_SWITCH true
+      // The Nesso N1 SX1262 PA needs the full ~140 mA OCP limit at 22 dBm.
+      #define OCP_TUNED 0x38
       #define HAS_BUSY true
       #define HAS_TCXO true
       #define HAS_BLE true

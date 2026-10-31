@@ -14,6 +14,8 @@ build/*
 .piolibdeps/
 
 # Local build / editor artifacts
+artifacts/
+__pycache__/
 compile_commands.json
 probe.d
 probe.o

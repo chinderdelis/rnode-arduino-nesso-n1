@@ -112,8 +112,14 @@
 
 #define SMALL_FONT &Org_01
 
-#if BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_NESSO_N1
+#if BOARD_MODEL == BOARD_TDECK
   Adafruit_ST7789 display = Adafruit_ST7789(DISPLAY_CS, DISPLAY_DC, -1);
+  #define SSD1306_WHITE ST77XX_WHITE
+  #define SSD1306_BLACK ST77XX_BLACK
+#elif BOARD_MODEL == BOARD_NESSO_N1
+  // NESSO N1 shares the single C6 SPI bus (index 0 / FSPI) between the radio
+  // and the ST7789, so bind the panel to the same explicit bus-0 instance.
+  Adafruit_ST7789 display = Adafruit_ST7789(&nessoSPI, DISPLAY_CS, DISPLAY_DC, -1);
   #define SSD1306_WHITE ST77XX_WHITE
   #define SSD1306_BLACK ST77XX_BLACK
 #elif BOARD_MODEL == BOARD_HELTEC_T114
@@ -131,6 +137,14 @@
   #define REFRESH_PERIOD 300000
 #else
   Adafruit_SSD1306 display(DISP_W, DISP_H, &Wire, DISP_RST);
+#endif
+
+#if BOARD_MODEL == BOARD_NESSO_N1
+  // The ST7789 shares the single C6 SPI bus (index 0) with the radio.
+  // Guard every panel access so a failed bus start can never dereference NULL.
+  #define DISPLAY_BUS_OK (nessoSPI.bus() != NULL)
+#else
+  #define DISPLAY_BUS_OK (true)
 #endif
 
 float disp_target_fps = 7;
@@ -170,6 +184,13 @@ int p_as_y = 0;
 
 GFXcanvas1 stat_area(64, 64);
 GFXcanvas1 disp_area(64, 64);
+
+#if BOARD_MODEL == BOARD_NESSO_N1
+  // The 128x64 RNode UI is scaled to 240x135 in one shot, so the panel never
+  // shows partially redrawn (flickering) regions and nothing gets clipped.
+  #define NESSO_FRAME_MAX_PIXELS (240 * 135)
+  uint16_t nesso_frame[NESSO_FRAME_MAX_PIXELS];
+#endif
 
 static const uint8_t one_counts[256] = {
   0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  1,  2,  1,  1,  1,  1,
@@ -349,8 +370,23 @@ bool display_init() {
       Wire.begin(SDA_OLED, SCL_OLED);
     #elif BOARD_MODEL == BOARD_NESSO_N1
       nesso_lcd_reset();
-      display.init(240, 135);
+      // Begin the shared bus-0 SPI (radio already did this, but ensure it here
+      // so the display works even if modem init was skipped). Pins: SCK=20,
+      // MISO=-1 (display is write-only), MOSI=21.
+      if (nessoSPI.bus() == NULL) {
+        nessoSPI.begin(DISPLAY_CLK, DISPLAY_MISO, DISPLAY_MOSI);
+      }
+      if (nessoSPI.bus() == NULL) {
+        // Bus could not be started; skip the panel instead of dereferencing
+        // a NULL SPI bus inside the Adafruit driver (hard fault).
+        return false;
+      }
+      // Native panel geometry is 135x240 (portrait); rotation 1 gives the
+      // 240x135 landscape view used by the RNode UI.
+      display.init(135, 240);
       display.setSPISpeed(40000000);
+      display.invertDisplay(true);
+      display.setRotation(1);
       nesso_lcd_backlight(true);
     #endif
 
@@ -422,7 +458,16 @@ bool display_init() {
         } else {
           disp_mode = DISP_MODE_PORTRAIT;
         }
-        display.setRotation(display_rotation);
+        #if BOARD_MODEL == BOARD_NESSO_N1
+          // Map RNode rotation semantics (0/2 landscape, 1/3 portrait) to
+          // the Adafruit ST7789 rotation used by the 135x240 panel.
+          if (display_rotation == 0)      { display.setRotation(1); }
+          else if (display_rotation == 2) { display.setRotation(3); }
+          else if (display_rotation == 1) { display.setRotation(0); }
+          else                            { display.setRotation(2); }
+        #else
+          display.setRotation(display_rotation);
+        #endif
       } else {
         #if BOARD_MODEL == BOARD_RNODE_NG_20
           disp_mode = DISP_MODE_PORTRAIT;
@@ -468,7 +513,7 @@ bool display_init() {
           display.setRotation(3);
         #elif BOARD_MODEL == BOARD_NESSO_N1
           disp_mode = DISP_MODE_LANDSCAPE;
-          display.setRotation(0);
+          display.setRotation(1);
         #else
           disp_mode = DISP_MODE_PORTRAIT;
           display.setRotation(3);
@@ -476,6 +521,10 @@ bool display_init() {
       }
 
       update_area_positions();
+
+      #if BOARD_MODEL == BOARD_NESSO_N1
+        display.fillScreen(SSD1306_BLACK);
+      #endif
 
       for (int i = 0; i < WATERFALL_SIZE; i++) { waterfall[i] = 0; }
 
@@ -523,6 +572,7 @@ bool display_init() {
 
 // Draws a line on the screen
 void drawLine(int16_t x, int16_t y, int16_t width, int16_t height, uint16_t colour) {
+  if (!DISPLAY_BUS_OK) { return; }
   #if BOARD_MODEL == BOARD_HELTEC_T114
   if(colour == SSD1306_WHITE){
     display.setColor(WHITE);
@@ -537,6 +587,7 @@ void drawLine(int16_t x, int16_t y, int16_t width, int16_t height, uint16_t colo
 
 // Draws a filled rectangle on the screen
 void fillRect(int16_t x, int16_t y, int16_t width, int16_t height, uint16_t colour) {
+  if (!DISPLAY_BUS_OK) { return; }
   #if BOARD_MODEL == BOARD_HELTEC_T114
   if(colour == SSD1306_WHITE){
     display.setColor(WHITE);
@@ -551,6 +602,7 @@ void fillRect(int16_t x, int16_t y, int16_t width, int16_t height, uint16_t colo
 
 // Draws a bitmap to the display and auto scales it based on the boards configured DISPLAY_SCALE
 void drawBitmap(int16_t startX, int16_t startY, const uint8_t* bitmap, int16_t bitmapWidth, int16_t bitmapHeight, uint16_t foregroundColour, uint16_t backgroundColour) {
+  if (!DISPLAY_BUS_OK) { return; }
   #if DISPLAY_SCALE == 1
     display.drawBitmap(startX, startY, bitmap, bitmapWidth, bitmapHeight, foregroundColour, backgroundColour);
   #else
@@ -574,6 +626,65 @@ void drawBitmap(int16_t startX, int16_t startY, const uint8_t* bitmap, int16_t b
     }
   #endif
 }
+
+#if BOARD_MODEL == BOARD_NESSO_N1
+void nesso_compose_frame() {
+  if (!DISPLAY_BUS_OK) { return; }
+  int fw = display.width();
+  int fh = display.height();
+  if (fw <= 0 || fh <= 0 || (fw * fh) > NESSO_FRAME_MAX_PIXELS) { return; }
+
+  memset(nesso_frame, 0, (size_t)fw * fh * sizeof(uint16_t));
+
+  bool portrait = (disp_mode == DISP_MODE_PORTRAIT);
+  int logical_w = portrait ? 64 : 128;
+  int logical_h = portrait ? 128 : 64;
+
+  // Fit the whole logical UI on the panel, preserving aspect ratio and
+  // centering it. This avoids cutting 16 pixels off the 256-pixel-wide
+  // two-canvas landscape layout.
+  int out_w = fw;
+  int out_h = (logical_h * out_w) / logical_w;
+  if (out_h > fh) {
+    out_h = fh;
+    out_w = (logical_w * out_h) / logical_h;
+  }
+  int ox = (fw - out_w) / 2;
+  int oy = (fh - out_h) / 2;
+
+  const uint8_t *disp_buf = disp_area.getBuffer();
+  const uint8_t *stat_buf = stat_area.getBuffer();
+  if (disp_buf == nullptr || stat_buf == nullptr) { return; }
+
+  uint32_t x_step = ((uint32_t)logical_w << 16) / (uint32_t)out_w;
+  uint32_t y_step = ((uint32_t)logical_h << 16) / (uint32_t)out_h;
+
+  for (int y = 0; y < out_h; y++) {
+    int ly = (int)(((uint32_t)y * y_step) >> 16);
+    uint16_t *dst = nesso_frame + (oy + y) * fw + ox;
+
+    if (portrait) {
+      const uint8_t *row = (ly < 64) ? (disp_buf + ly * 8) : (stat_buf + (ly - 64) * 8);
+      for (int x = 0; x < out_w; x++) {
+        int lx = (int)(((uint32_t)x * x_step) >> 16);
+        if (row[lx >> 3] & (0x80 >> (lx & 7))) { dst[x] = SSD1306_WHITE; }
+      }
+    } else {
+      const uint8_t *drow = disp_buf + ly * 8;
+      const uint8_t *srow = stat_buf + ly * 8;
+      for (int x = 0; x < out_w; x++) {
+        int lx = (int)(((uint32_t)x * x_step) >> 16);
+        bool on;
+        if (lx < 64) { on = drow[lx >> 3] & (0x80 >> (lx & 7)); }
+        else         { on = srow[(lx - 64) >> 3] & (0x80 >> ((lx - 64) & 7)); }
+        if (on) { dst[x] = SSD1306_WHITE; }
+      }
+    }
+  }
+
+  display.drawRGBBitmap(0, 0, nesso_frame, fw, fh);
+}
+#endif
 
 extern uint8_t wifi_mode;
 extern bool wifi_is_connected();
@@ -1036,7 +1147,26 @@ void update_disp_area() {
   }
 }
 
+#if BOARD_MODEL == BOARD_NESSO_N1
+void update_nesso_display() {
+  if (eeprom_ok && !firmware_update_mode && !console_active) {
+    draw_stat_area();
+  } else {
+    stat_area.fillScreen(SSD1306_BLACK);
+    if (firmware_update_mode) {
+      stat_area.drawBitmap(0, 0, bm_updating, stat_area.width(), stat_area.height(), SSD1306_BLACK, SSD1306_WHITE);
+    } else if (console_active && device_init_done) {
+      stat_area.drawBitmap(0, 0, bm_console, stat_area.width(), stat_area.height(), SSD1306_BLACK, SSD1306_WHITE);
+    }
+  }
+
+  draw_disp_area();
+  nesso_compose_frame();
+}
+#endif
+
 void display_recondition() {
+  if (!DISPLAY_BUS_OK) { return; }
   #if PLATFORM == PLATFORM_ESP32
     for (uint8_t iy = 0; iy < disp_area.height(); iy++) {
       unsigned char rand_seg [] = {random(0xFF),random(0xFF),random(0xFF),random(0xFF),random(0xFF),random(0xFF),random(0xFF),random(0xFF)};
@@ -1044,12 +1174,16 @@ void display_recondition() {
       disp_area.drawBitmap(0, iy, rand_seg, 64, 1, SSD1306_WHITE, SSD1306_BLACK);
     }
 
-    drawBitmap(p_ad_x, p_ad_y, disp_area.getBuffer(), disp_area.width(), disp_area.height(), SSD1306_WHITE, SSD1306_BLACK);
-    if (disp_mode == DISP_MODE_PORTRAIT) {
-      drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
-    } else if (disp_mode == DISP_MODE_LANDSCAPE) {
-      drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
-    }
+    #if BOARD_MODEL == BOARD_NESSO_N1
+      nesso_compose_frame();
+    #else
+      drawBitmap(p_ad_x, p_ad_y, disp_area.getBuffer(), disp_area.width(), disp_area.height(), SSD1306_WHITE, SSD1306_BLACK);
+      if (disp_mode == DISP_MODE_PORTRAIT) {
+        drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
+      } else if (disp_mode == DISP_MODE_LANDSCAPE) {
+        drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
+      }
+    #endif
   #endif
 }
 
@@ -1069,6 +1203,7 @@ bool epd_blanked = false;
 #endif
 
 void update_display(bool blank = false) {
+  if (!DISPLAY_BUS_OK) { return; }
   display_updating = true;
   if (blank == true) {
     last_disp_update = millis()-disp_update_interval-1;
@@ -1144,8 +1279,12 @@ void update_display(bool blank = false) {
           display.fillScreen(SSD1306_WHITE);
         #endif
 
-        update_stat_area();
-        update_disp_area();
+        #if BOARD_MODEL == BOARD_NESSO_N1
+          update_nesso_display();
+        #else
+          update_stat_area();
+          update_disp_area();
+        #endif
       }
       
       #if BOARD_MODEL == BOARD_TECHO

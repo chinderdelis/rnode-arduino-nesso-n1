@@ -1,9 +1,9 @@
 > [!NOTE]
-> This is a **fork** of RNode Firmware containing an **experimental, in-testing port**
-> for the **Arduino Nesso N1** (ESP32-C6 + SX1262). See
-> [`README_NESSO_N1.md`](./README_NESSO_N1.md) for the port description, implemented
-> features, build instructions and known limitations. The upstream project
-> documentation follows below.
+> This is a **fork** of RNode Firmware containing an **experimental, hardware-tested
+> port** for the **Arduino Nesso N1** (ESP32-C6 + SX1262). See
+> [`README_NESSO_N1.md`](./README_NESSO_N1.md) for the port description, validated
+> features, remaining limitations, build instructions and prebuilt binaries. The
+> upstream project documentation follows below.
 
 > [!WARNING]
 > RNode is a free, community-developed project, and everything you need to use and build upon it is openly and freely available. Support honest, hard-working builders and maintainers, not [LLM-powered grifters](https://www.youtube.com/watch?v=_znz-3f_66Q) trying to scam you for thousands of dollars.

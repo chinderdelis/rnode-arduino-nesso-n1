@@ -341,31 +341,30 @@ char bt_devname[11];
         } else {
           bt_enabled = false;
         }
-        if (btStart()) {
-          #if defined(CONFIG_BLUEDROID_ENABLED)
-            if (esp_bluedroid_init() != ESP_OK) { return false; }
-            if (esp_bluedroid_enable() != ESP_OK) { return false; }
-            const uint8_t* bda_ptr = esp_bt_dev_get_address();
-          #elif defined(CONFIG_NIMBLE_ENABLED)
-            uint8_t bda_buf[BT_DEV_ADDR_LEN];
-            esp_read_mac(bda_buf, ESP_MAC_BT);
-            const uint8_t* bda_ptr = bda_buf;
-          #endif
-          char *data = (char*)malloc(BT_DEV_ADDR_LEN+1);
-          for (int i = 0; i < BT_DEV_ADDR_LEN; i++) {
-              data[i] = bda_ptr[i];
-          }
-          data[BT_DEV_ADDR_LEN] = EEPROM.read(eeprom_addr(ADDR_SIGNATURE));
-          unsigned char *hash = MD5::make_hash(data, BT_DEV_ADDR_LEN);
-          memcpy(bt_dh, hash, BT_DEV_HASH_LEN);
-          sprintf(bt_devname, "RNode %02X%02X", bt_dh[14], bt_dh[15]);
-          free(data);
+        #if defined(CONFIG_BLUEDROID_ENABLED)
+          if (!btStart()) { return false; }
+          if (esp_bluedroid_init() != ESP_OK) { return false; }
+          if (esp_bluedroid_enable() != ESP_OK) { return false; }
+          const uint8_t* bda_ptr = esp_bt_dev_get_address();
+        #elif defined(CONFIG_NIMBLE_ENABLED)
+          uint8_t bda_buf[BT_DEV_ADDR_LEN];
+          esp_read_mac(bda_buf, ESP_MAC_BT);
+          const uint8_t* bda_ptr = bda_buf;
+        #endif
+        char *data = (char*)malloc(BT_DEV_ADDR_LEN+1);
+        for (int i = 0; i < BT_DEV_ADDR_LEN; i++) {
+            data[i] = bda_ptr[i];
+        }
+        data[BT_DEV_ADDR_LEN] = EEPROM.read(eeprom_addr(ADDR_SIGNATURE));
+        unsigned char *hash = MD5::make_hash(data, BT_DEV_ADDR_LEN);
+        memcpy(bt_dh, hash, BT_DEV_HASH_LEN);
+        sprintf(bt_devname, "RNode %02X%02X", bt_dh[14], bt_dh[15]);
+        free(data);
 
-          bt_security_setup();
+        bt_security_setup();
 
-          bt_ready = true;
-          return true;
-        } else { return false; }
+        bt_ready = true;
+        return true;
       } else { return false; }
     }
 
