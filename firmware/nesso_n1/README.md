@@ -2,7 +2,7 @@
 
 **Hardware-tested on a physical Arduino Nesso N1.** This is an experimental
 port, not a production release. See the main
-[`README_NESSO_N1.md`](../../README_NESSO_N1.md) for validated features and
+[`README.md`](../../README.md) for validated features and
 remaining limitations.
 
 ## Contents

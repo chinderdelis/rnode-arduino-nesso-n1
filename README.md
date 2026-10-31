@@ -1,178 +1,243 @@
-> [!NOTE]
-> This is a **fork** of RNode Firmware containing an **experimental, hardware-tested
-> port** for the **Arduino Nesso N1** (ESP32-C6 + SX1262). See
-> [`README_NESSO_N1.md`](./README_NESSO_N1.md) for the port description, validated
-> features, remaining limitations, build instructions and prebuilt binaries. The
-> upstream project documentation follows below.
+# RNode Firmware for Arduino Nesso N1
 
-> [!WARNING]
-> RNode is a free, community-developed project, and everything you need to use and build upon it is openly and freely available. Support honest, hard-working builders and maintainers, not [LLM-powered grifters](https://www.youtube.com/watch?v=_znz-3f_66Q) trying to scam you for thousands of dollars.
+> [!NOTE]
+> This is the main README for the Arduino Nesso N1 port. The original upstream
+> RNode Firmware README is preserved in
+> [`README_UPSTREAM.md`](./README_UPSTREAM.md).
+
+> [!IMPORTANT]
+> **This port has been built, flashed, provisioned and tested on a physical
+> Arduino Nesso N1.** The firmware is not only a successful compile; it has
+> been exercised on real hardware.
 >
-> If you want to buy an RNode device rather than build it yourself, do so from honest, accountable makers, **not** sensationalist YouTubers making outrageously false claims and selling devices for $1100, while stealing the work of the community.
->
-> Several hastily launched, incorrect, and in most cases entirely LLM-generated fakes of RNode-based devices, associated tools, "guides" and "documentation" are currently being circulated, marketed and sold for outrageous prices, or being used to advertise crypto-currency tokens.
->
-> Most of these hoaxes violate the open source GPLv3 and Creative Commons licenses that RNode and associated documentation and resources were published under, while at the same time claiming independent ownership and license grants.
->
-> Such claims or grants are **not legally valid**, and **not** recognized by the RNode authors and copyright holders.
->
-> Any claimed assertion of copyright or grant of license that such projects are making are [void grants](https://reticulum.network/manual/brandolinis.html#void-grants-legal-foundations-of-machine-generated-code).
->
-> Both the violators themselves, and **all** downstream projects using the infringing derivatives, are **directly** and **personally** liable for the legal consequences.
->
-> For trustworthy community resources, see the [main Reticulum repository](https://github.com/markqvist/Reticulum#community-resources). For more detailed information, see the relevant sections of the [Brandolini's Reference](https://reticulum.network/manual/brandolinis.html) chapter of the Reticulum Manual. For software and projects recognized by the Reticulum community, see the [Programs Using Reticulum](https://reticulum.network/manual/software.html) chapter.
->
-> Do **not** use these "projects", they are a hazard to the entire ecosystem we have been carefully building over the last ten years.
+> The port is still **experimental**. "Tested on hardware" does not mean that
+> every feature has been validated, and it does not mean that this is a
+> production-ready release. The exact test coverage and the remaining gaps are
+> listed in this document.
+
+This is an unofficial port of the [RNode Firmware](https://github.com/markqvist/RNode_Firmware)
+to the **Arduino Nesso N1** (ESP32-C6 + SX1262). It is based on the upstream
+RNode Firmware by Mark Qvist and is distributed under the same **GPLv3** license.
+All original copyrights remain with their respective authors.
 
 ---
 
-*This repository is [a public mirror](./MIRROR.md). All development is happening elsewhere.*
+## Hardware
 
-# RNode Firmware
+| Item | Details |
+|------|---------|
+| Board | Arduino Nesso N1 |
+| MCU | ESP32-C6 (RISC-V, Wi-Fi 6 / BLE 5) |
+| Radio | Semtech SX1262 (LoRa) |
+| Display | ST7789 240x135 IPS (SPI) |
+| Power | BQ27220 fuel gauge + AW32001 charger |
+| GPIO expansion | 2x PI4IOE5V6408 I2C expanders |
+| Buttons | KEY1 / KEY2 on the GPIO expander |
 
-This is the open firmware that powers RNode devices.
+## Current firmware
 
-For a great overview of how to get started, and what you can do with an RNode, see the community-provided [RNode Manual by RNS Moscow](https://docs.rns.moscow/rnode-manual/).
+| Item | Value |
+|------|-------|
+| RNode firmware | `1.56` (`0x0156`) |
+| Board model | `0x43` |
+| RNode product / model | `0xEC` / `0xEF` (868/915 MHz) |
+| RAM usage | `120152 / 327680` bytes (`36.7%`) |
+| Flash application usage | `930566 / 1310720` bytes (`71.0%`) |
+| Application image | `978128` bytes |
+| Factory image | `1043664` bytes |
+| Application image SHA-256 | `d952dc9a19f38227f9ea64acaf822d9c9b1960c0835f949a25ec4bd99c420589` |
+| Embedded firmware hash | `127d0a5026b57f2913bbec5a975646f5036788058a04244e17a152c89aa13dfb` |
 
-An RNode is an open, free and unrestricted digital radio transceiver. It enables anyone to send and receive any kind of data over both short and very long distances. RNodes can be used with many different kinds of programs and systems, but they are especially well suited for use with [Reticulum](https://reticulum.network).
+Prebuilt binaries, flashing instructions and checksums are in
+[`firmware/nesso_n1/`](./firmware/nesso_n1/), and attached to the
+[`nesso-n1-fw-1.56` release](https://github.com/chinderdelis/rnode-arduino-nesso-n1/releases/tag/nesso-n1-fw-1.56).
 
-RNode is not a product, and not any *one* specific device in particular. It is a system that is easy to replicate across space and time, that produces highly functional communications tools, which respects user autonomy and empowers individuals and communities to protect their sovereignty, privacy and ability to communicate and exchange data and ideas freely.
+## Verified on physical hardware
 
-<img src="Documentation/images/rnv21_bgp.webp" width="100%">
+The following items were checked on a physical Nesso N1 running this build:
 
-<center><i>An RNode made from readily available and cheap parts, in a durable 3D printed case</i></center><br/><br/>
+| Area | Result |
+|------|--------|
+| Boot | Firmware boots and enumerates over USB. |
+| USB serial | RNode KISS/HDLC communication works for configuration and status commands. |
+| Provisioning | EEPROM info block, configuration, lock byte and firmware hash are written and verified. |
+| Display | Full RNode UI is rendered correctly in landscape on the 240x135 panel. |
+| Button | `KEY1` blanks and unblanks the display; `CMD_DISP_INT` also unblanks it. |
+| Radio initialization | SX1262 starts successfully with the expected EU868 configuration. |
+| Radio transmit path | A KISS transmit command was accepted and completed without a firmware error. No second LoRa node was available to confirm over-the-air reception. |
+| BLE | BLE starts, stops and advertises as an RNode device. |
+| Battery | The fuel gauge reports battery state `3`, charge `100%` while connected to USB. |
+| Persistence | Radio configuration and provisioning survive reboots. |
 
-The RNode system is primarily software, which *transforms* different kinds of available hardware devices into functional, physical RNodes, which can then be used to solve a wide range of communications tasks. Such RNodes can be modified and built to suit the specific time, locale and environment they need to exist in.
+The tested radio configuration was:
 
-## Latest Release
+- Frequency: `869.525 MHz`
+- Bandwidth: `125 kHz`
+- Spreading factor: `8`
+- Coding rate: `5`
+- TX power: `14 dBm`
 
-The latest release, installable through `rnodeconf`, is version `1.86`. You must have at least version `2.4.1` of `rnodeconf` installed to update the RNode Firmware to version `1.86`. Get it by updating the `rns` package to at least version `1.1.9`.
+These are the defaults written by the provisioning helper. They are not a
+requirement and can be changed through the normal RNode KISS commands.
 
-## A Self-Replicating System
+## Not yet verified or not implemented
 
-If you notice the presence of a circularity in the naming of the system as a whole, and the physical devices, it is no coincidence. Every RNode contains the seeds necessary to reproduce the system, the [RNode Bootstrap Console](https://unsigned.io/rnode_bootstrap_console), which is hosted locally on every RNode, and can be activated and accesses at any time - no Internet required.
+These items must not be assumed to work just because the board boots:
 
-The designs, guides and software stored within allows users to create more RNodes, and even to bootstrap entire communications networks, completely independently of existing infrastructure, or in situations where infrastructure has become unreliable or is broken.
+- **LoRa receive:** not tested end-to-end, because no second LoRa peer was
+  available.
+- **Over-the-air transmit confirmation:** the transmit path completed without a
+  firmware error, but no receiver confirmed the packet.
+- **BLE data transport:** pairing, connection stability and KISS data transfer
+  over BLE were not completed.
+- **Display modes:** portrait orientation, recondition mode, automatic display
+  blanking and the console/update screens were not validated.
+- **Firmware update flow:** the RNode firmware-update display path was not
+  validated.
+- **Wi-Fi / Remote:** not enabled in this build.
+- **Deep sleep / power-off:** not implemented for this board.
+- **KEY2, Grove and other expansion features:** not mapped or implemented.
+- **Battery details:** voltage, charge current and charging behavior were not
+  validated under different power conditions. The 100% reading was observed on
+  USB.
+- **ESP32-C6 temperature:** not exposed by this port.
+- **Long-term stability:** one interrupt watchdog panic was observed once after
+  a USB/RTS reset. It did not reproduce during subsequent testing. This remains
+  under investigation.
 
-<img src="Documentation/images/126dcfe92fb7.webp" width="100%"/>
+## Display implementation
 
-<center><i>Where there is no Internet, RNodes will still communicate</i></center><br/><br/>
+The Nesso N1 display path is intentionally different from the small OLED boards:
 
-The production of one particular RNode device is not an end, but the potential starting point of a new branch of devices on the tree of the RNode system as a whole.
+- The standard 128x64 RNode UI is composed into a static `240x135` RGB565 frame
+  buffer.
+- Landscape mode renders at `240x120`, centered with 7-pixel black bars above
+  and below.
+- Portrait mode code exists and renders at `120x240`, centered with 7-pixel
+  black bars on the left and right. Portrait has not yet been visually tested.
+- The panel is updated with one full-frame `drawRGBBitmap()` call per refresh,
+  which avoids partial-region tearing and flicker.
+- The LCD reset and backlight are controlled through the I2C GPIO expander.
 
-This tree fits into the larger biome of Free & Open Communications Systems, which I hope that you - by using communications tools like RNode - will help grow and prosper.
+## Build
 
-## One Tool, Many Uses
+The port is built with [PlatformIO](https://platformio.org/):
 
-The RNode design is meant to flexible and hackable. At it's core, it is a low-power, but extremely long-range digital radio transceiver. Coupled with Reticulum, it provides encrypted and secure communications.
-
-Depending on configuration, it can be used for local networking purposes, or to send data over very long distances. Once you have an RNode, there is a wide variety of possible uses:
-
-- As a network adapter for [Reticulum](https://reticulum.network)
-- Messaging using [Sideband](https://unsigned.io/software/Sideband.html)
-- Information sharing and communication using [Nomad Network](https://unsigned.io/software/Nomad_Network.html)
-- LoRa-based [KISS-compatible amateur radio TNC](https://unsigned.io/guides/2020_05_03_using_rnodes_with_amateur_radio_software.html)
-- LoRa development platform
-- [Packet sniffer](https://unsigned.io/software/LoRaMon.html) for LoRa networks
-- Long range [Ethernet and IP network interface](https://unsigned.io/guides/2020_05_27_ethernet-and-ip-over-packet-radio-tncs.html) on Linux
-- As a general-purpose long-range data radio
-
-## Types & Performance
-
-RNodes can be made in many different configurations, and can use many different radio bands, but they will generally operate in the **433 MHz**, **868 MHz**, **915 MHZ** and **2.4 GHz** bands. They will usually offer configurable on-air data speeds between just a **few hundred bits per second**, up to **a couple of megabits per second**. Maximum output power will depend on the transceiver and PA setup used, but will generally lie between **17 dbm** and **27 dBm**.
-
-The RNode system has been designed to allow reliable systems for basic human communications, over very wide areas, while using very little power, being cheap to build, free to operate, and near impossible to censor.
-
-While **speeds are lower** than WiFi, typical communication **ranges are many times higher**. Several kilometers can be acheived with usable bitrates, even in urban areas, and over **100 kilometers** can be achieved in line-of-sight conditions.
-
-## Supported Boards & Devices
-It's easy to create your own RNodes from one of the supported development boards and devices. If a device or board you want to use is not yet supported, you are welcome to join the effort and help creating a board definition and pin mapping for it!
-
-<img src="Documentation/images/devboards_1.webp" width="100%"/>
-
-The RNode Firmware supports the following boards:
-
-- LilyGO T-Beam v1.1 devices with SX1276/8 LoRa chips
-- LilyGO T-Beam v1.1 devices with SX1262/8 LoRa chips
-- LilyGO T-Beam Supreme devices
-- LilyGO T-Deck devices (currently display is disabled)
-- LilyGO LoRa32 v1.0 devices
-- LilyGO LoRa32 v2.0 devices
-- LilyGO LoRa32 v2.1 devices (with and without TCXO)
-- LilyGO T3S3 devices with SX1276/8 LoRa chips
-- LilyGO T3S3 devices with SX1262/8 LoRa chips
-- LilyGO T3S3 devices with SX1280 LoRa chips
-- LilyGO T-Echo devices
-- Heltec LoRa32 v2 devices
-- Heltec LoRa32 v3 devices
-- Heltec LoRa32 v4 devices
-- Heltec T114 devices
-- RAK4631 devices
-- SeeedStudio XIAO ESP32S3 devices (with Wio-SX1262)
-- Homebrew RNodes based on ATmega1284p boards
-- Homebrew RNodes based on ATmega2560 boards
-- Homebrew RNodes based on Adafruit Feather ESP32 boards
-- Homebrew RNodes based on generic ESP32 boards
-
-## Supported Transceiver Modules
-The RNode Firmware supports all transceiver modules based on Semtech **SX1276**, **SX1278**, **SX1262**, **SX1268** and **SX1280** chips, that have an **SPI interface** and expose the relevant **DIO** interrupt pins from the chip.
-
-## Getting Started Fast
-You can download and flash the firmware to all the supported boards using the [RNode Config Utility](https://github.com/markqvist/rnodeconfigutil). All firmware releases are now handled and installed directly through the `rnodeconf` utility, which is included in the `rns` package. It can be installed via `pip`:
-
+```bash
+pio run -e nesso_n1
+pio run -e nesso_n1 -t upload
 ```
-# Install rnodeconf via rns package
-pip install rns --upgrade
 
-# Install the firmware on a board with the install guide
-rnodeconf --autoinstall
+Build output is written to `.pio/build/nesso_n1/`:
+
+| File | Purpose |
+|------|---------|
+| `bootloader.bin` | ESP32-C6 bootloader, offset `0x0` |
+| `partitions.bin` | partition table, offset `0x8000` |
+| `boot_app0.bin` | OTA selector, offset `0xe000` |
+| `firmware.bin` | application image, offset `0x10000` |
+| `firmware.factory.bin` | complete merged image, offset `0x0` |
+
+The build maps the local home directory to `/home/user` in embedded debug
+strings, so local usernames and source paths are not included in the firmware
+images.
+
+## Flash prebuilt binaries
+
+The repository includes ready-to-flash images in
+[`firmware/nesso_n1/`](./firmware/nesso_n1/).
+
+### Recommended: full factory image
+
+This writes the bootloader, partition table, OTA selector and application:
+
+```bash
+esptool --chip esp32c6 -p /dev/ttyACM0 -b 460800 \
+  write_flash 0x0 firmware/nesso_n1/firmware.factory.bin
 ```
 
-For most of the supported device types, it is also possible to use [Liam Cottle's Web-based RNode Flasher](https://liamcottle.github.io/rnode-flasher/). This option may be easier if you're not familiar with using a command line interface.
+Replace `/dev/ttyACM0` with the correct port.
 
-For more detailed instruction and in-depth guides, you can have a look at some of these resources:
+### Application update only
 
-- Create a [basic RNode from readily available development boards](https://unsigned.io/guides/2022_01_25_installing-rnode-firmware-on-supported-devices.html)
-- Follow a complete build recipe for [making a handheld RNode](https://unsigned.io/guides/2023_01_14_Making_A_Handheld_RNode.html), like the one pictured above
-- Learn the basics on how to [create and build your own RNode designs](https://unsigned.io/guides/2022_01_26_how-to-make-your-own-rnodes.html) from scratch
-- Once you've got the hang of it, start building RNodes for your community, or [even for selling them](https://unsigned.io/sell_rnodes.html)
+This preserves the bootloader and partition table and writes only the
+application:
 
-If you would rather just buy a pre-made unit, you can visit one of the community vendors that produce and sell RNodes:
+```bash
+esptool --chip esp32c6 -p /dev/ttyACM0 -b 460800 \
+  write_flash 0x10000 firmware/nesso_n1/firmware.bin
+```
 
-- [Liberated Embedded Systems](https://store.liberatedsystems.co.uk/)
-- [Simply Equipped](https://simplyequipped.com/)
+### Manual component flashing
 
-If you'd like to have your shop added to this list, let me know.
+```bash
+esptool --chip esp32c6 -p /dev/ttyACM0 -b 460800 write_flash \
+  0x0     firmware/nesso_n1/bootloader.bin \
+  0x8000  firmware/nesso_n1/partitions.bin \
+  0xe000  firmware/nesso_n1/boot_app0.bin \
+  0x10000 firmware/nesso_n1/firmware.bin
+```
 
-## Support RNode Development
-You can help support the continued development of open, free and private communications systems by donating via one of the following channels:
+### Provision after flashing
 
-- Monero:
-  ```
-  84FpY1QbxHcgdseePYNmhTHcrgMX4nFfBYtz2GKYToqHVVhJp8Eaw1Z1EedRnKD19b3B8NiLCGVxzKV17UMmmeEsCrPyA5w
-  ```
-- Bitcoin
-  ```
-  bc1pgqgu8h8xvj4jtafslq396v7ju7hkgymyrzyqft4llfslz5vp99psqfk3a6
-  ```
-- Ethereum
-  ```
-  0x91C421DdfB8a30a49A71d63447ddb54cEBe3465E
-  ```
-- Liberapay: https://liberapay.com/Reticulum/
+`rnodeconf` does not currently know the Nesso N1, so use the included helper:
 
-- Ko-Fi: https://ko-fi.com/markqvist
+```bash
+python3 tools/provision_nesso.py \
+  --port /dev/ttyACM0 \
+  --firmware firmware/nesso_n1/firmware.bin \
+  --yes
+```
 
+The helper writes the Nesso info block, the default radio configuration, the
+EEPROM lock byte and the firmware hash target. It refuses to overwrite a
+non-Nesso locked EEPROM unless `--force` is supplied.
 
-## License & Use
-The RNode Firmware is Copyright © 2024 Mark Qvist / [unsigned.io](https://unsigned.io), and is made available under the **GNU General Public License v3.0**. The source code includes an SX1276 driver that is released under MIT License, and Copyright © 2018 Sandeep Mistry / Mark Qvist.
+Check the result with:
 
-You can obtain the source code from [git.unsigned.io](https://git.unsigned.io/markqvist/RNode_Firmware) or [GitHub](https://github.com/markqvist/rnode_firmware).
+```bash
+python3 tools/provision_nesso.py --port /dev/ttyACM0 --dump
+```
 
-Every RNode also includes an internal copy of it's own firmware source code, that can be downloaded through the [RNode Bootstrap Console](https://unsigned.io/rnode_bootstrap_console), by putting the RNode into Console Mode (which can be activated by pressing the reset button two times within two seconds).
+## Before flashing an original device
 
-The RNode Ecosystem is free and non-proprietary, and actively seeks to distribute it's ownership and control. If you want to build RNodes for commercial purposes, including selling them, you must do so adhering to the Open Source licenses that the various parts of the RNode project is released under, and under your own responsibility.
+If the Nesso N1 still runs its factory firmware, make a complete flash backup
+first:
 
-If you distribute or modify this work, you **must** adhere to the terms of the GPLv3, including, but not limited to, providing up-to-date source code upon distribution, displaying appropriate copyright and license notices in prominent positions of all conveyed works, and making users aware of their rights to the software under the GPLv3.
+```bash
+python3 tools/nesso_flash_backup.py backup --out-dir ~/nesso_backup
+```
 
-In practice, this means that you can use the firmware commercially, but you must understand your obligation to provide all future users of the system with the same rights, that you have been provided by the GPLv3. If you intend using the RNode Firmware commercially, it is worth reading [this page](https://unsigned.io/sell_rnodes.html).
+Restore it with:
+
+```bash
+python3 tools/nesso_flash_backup.py restore ~/nesso_backup/nesso_backup_XXXX.bin --yes
+```
+
+The repository does **not** contain full-flash dumps, device-specific
+credentials, Wi-Fi passwords, private keys or MAC-address data.
+
+## Protocol notes
+
+- KISS commands with no payload need at least one dummy byte in the frame to be
+  dispatched by this firmware.
+- `CMD_DISP_READ` returns 1024 bytes: the first 512 bytes of the display canvas
+  followed by the first 512 bytes of the status canvas.
+- `CMD_STAT_TX` currently returns `00000000`. Its counter is not a reliable
+  transmit confirmation in this build.
+- `CMD_DISP_INT` with `0xFF` unblanks the display and stores the intensity.
+- `CMD_DISP_RCND` enables display reconditioning until the next reboot.
+
+## Contributing
+
+Issues, test reports and pull requests are welcome, especially from people who
+can test the remaining items with a second LoRa node or a BLE host. The upstream
+project remains the authoritative source for generic RNode behavior:
+
+- Upstream firmware: <https://github.com/markqvist/RNode_Firmware>
+- Reticulum: <https://reticulum.network>
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0**, the same
+license as the upstream RNode Firmware. See [`LICENSE`](./LICENSE) for details.
